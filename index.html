@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Baseball Lineup</title>
+<style>
+  :root {
+    --grass: #4a8b3b;
+    --grass-dark: #356a29;
+    --dirt: #b9874a;
+    --dirt-dark: #8a5f30;
+    --line: #ffffff;
+    --bg: #f4f1ea;
+    --panel: #ffffff;
+    --ink: #1f2937;
+    --muted: #6b7280;
+    --accent: #b91c1c;
+    --accent-2: #1d4ed8;
+    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.06);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    min-height: 100vh;
+  }
+  header {
+    padding: 14px 20px;
+    background: var(--panel);
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  header h1 {
+    font-size: 18px;
+    margin: 0;
+    letter-spacing: .3px;
+  }
+  header h1 span { color: var(--accent); }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+  button, .btn {
+    font: inherit;
+    border: 1px solid #d1d5db;
+    background: #fff;
+    color: var(--ink);
+    padding: 7px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, transform .05s;
+  }
+  button:hover { background: #f3f4f6; }
+  button:active { transform: translateY(1px); }
+  button.primary { background: var(--accent-2); color: white; border-color: var(--accent-2); }
+  button.primary:hover { background: #1e40af; }
+  button.danger { color: var(--accent); border-color: #fecaca; }
+  button.danger:hover { background: #fef2f2; }
+
+  main {
+    display: grid;
+    grid-template-columns: 320px 1fr 280px;
+    gap: 16px;
+    padding: 16px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .panel {
+    background: var(--panel);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    padding: 14px;
+  }
+  .panel h2 {
+    margin: 0 0 10px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  /* roster */
+  .roster-input { display: flex; gap: 6px; margin-bottom: 10px; }
+  .roster-input input {
+    flex: 1;
+    padding: 7px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font: inherit;
+  }
+  .roster-input input:focus { outline: 2px solid var(--accent-2); outline-offset: -1px; }
+  .roster-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 40px;
+  }
+  .player {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    background: #fafaf7;
+    border: 1px solid #e7e5e0;
+    border-radius: 6px;
+    cursor: grab;
+    user-select: none;
+  }
+  .player:hover { background: #f3f1ea; }
+  .player.dragging { opacity: .4; }
+  .player.placed { opacity: .55; font-style: italic; }
+  .player .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .player .pos-tag {
+    font-size: 10px;
+    padding: 2px 5px;
+    background: #e5e7eb;
+    border-radius: 3px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .player .x {
+    cursor: pointer;
+    color: var(--muted);
+    padding: 0 4px;
+    font-size: 16px;
+    line-height: 1;
+  }
+  .player .x:hover { color: var(--accent); }
+
+  /* field */
+  .field-wrap {
+    background: var(--panel);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+  }
+  .field-wrap h2 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    color: var(--muted);
+  }
+  .field {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background: var(--grass);
+    border-radius: 8px;
+    overflow: hidden;
+    background-image: repeating-linear-gradient(
+      45deg,
+      var(--grass) 0 24px,
+      var(--grass-dark) 24px 48px
+    );
+  }
+  .slot {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    width: 78px;
+    height: 78px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.18);
+    border: 2px dashed rgba(255,255,255,.55);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    text-align: center;
+    font-size: 11px;
+    text-shadow: 0 1px 2px rgba(0,0,0,.4);
+    cursor: pointer;
+    transition: background .15s, transform .15s, border-color .15s;
+  }
+  .slot:hover { background: rgba(255,255,255,.3); }
+  .slot.over {
+    background: rgba(255, 235, 59, .35);
+    border-color: #ffeb3b;
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+  .slot .pos {
+    font-weight: 700;
+    font-size: 14px;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+  .slot .label { font-size: 9px; opacity: .9; line-height: 1; }
+  .slot.filled {
+    background: white;
+    color: var(--ink);
+    text-shadow: none;
+    border: 2px solid #1f2937;
+  }
+  .slot.filled .pos { color: var(--accent); }
+  .slot.filled .who {
+    font-size: 11px;
+    font-weight: 600;
+    margin-top: 3px;
+    padding: 0 4px;
+    line-height: 1.1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .slot .clear {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    font-size: 12px;
+    line-height: 16px;
+    text-align: center;
+    cursor: pointer;
+    display: none;
+    border: 2px solid white;
+  }
+  .slot.filled .clear { display: block; }
+
+  /* diamond decorations */
+  .diamond-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  /* batting order */
+  .batting-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    counter-reset: bat;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .bat-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    background: #fafaf7;
+    border: 1px solid #e7e5e0;
+    border-radius: 6px;
+    cursor: grab;
+    user-select: none;
+  }
+  .bat-item.dragging { opacity: .4; }
+  .bat-item.over { border-color: var(--accent-2); background: #eff6ff; }
+  .bat-item .num {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+  .bat-item .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bat-item .pos-tag { font-size: 10px; color: var(--muted); font-weight: 600; }
+  .bat-item.empty { color: var(--muted); font-style: italic; cursor: default; }
+  .bat-item.empty .num { background: #d1d5db; }
+
+  .hint { color: var(--muted); font-size: 11px; margin-top: 8px; }
+
+  /* print */
+  @media print {
+    body { background: white; }
+    header, .toolbar, .roster-input, .player .x, .slot.filled .clear,
+    .panel h2 .btn, .hint, .roster-panel, .clear-all-btn {
+      display: none !important;
+    }
+    main {
+      grid-template-columns: 1fr 1fr;
+      max-width: none;
+      gap: 12px;
+      padding: 8px;
+    }
+    .panel, .field-wrap { box-shadow: none; border: 1px solid #ccc; padding: 10px; }
+    .field {
+      background: white !important;
+      background-image: none !important;
+      border: 1px solid #999;
+    }
+    .slot {
+      background: white !important;
+      color: black !important;
+      text-shadow: none !important;
+      border: 1px solid #333 !important;
+    }
+    .slot:not(.filled) { opacity: .35; }
+    .slot .pos { color: var(--accent); }
+    .diamond-svg .grass-line { stroke: #888 !important; }
+    .print-title {
+      display: block !important;
+      text-align: center;
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .print-date { display: block !important; text-align: center; font-size: 11px; color: #666; margin-bottom: 12px; }
+    @page { margin: 0.4in; }
+  }
+  .print-title, .print-date { display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚾ Baseball Lineup <span>Builder</span></h1>
+  <div class="toolbar">
+    <button id="btnAutoFill">Auto-fill Batting Order</button>
+    <button class="danger clear-all-btn" id="btnClearAll">Clear All</button>
+    <button class="primary" id="btnPrint">🖨 Print Lineup</button>
+  </div>
+</header>
+
+<div class="print-title" id="printTitle">Team Lineup</div>
+<div class="print-date" id="printDate"></div>
+
+<main>
+  <!-- Roster -->
+  <section class="panel roster-panel">
+    <h2>Roster <span id="rosterCount" style="font-weight:400;text-transform:none;letter-spacing:0;"></span></h2>
+    <form class="roster-input" id="rosterForm">
+      <input id="playerInput" type="text" placeholder="Player name" autocomplete="off" maxlength="40" />
+      <button class="primary" type="submit">Add</button>
+    </form>
+    <ul class="roster-list" id="rosterList"></ul>
+    <p class="hint">Drag players onto the field. Click an X to remove.</p>
+  </section>
+
+  <!-- Field -->
+  <section class="field-wrap">
+    <h2>Field</h2>
+    <div class="field" id="field">
+      <svg class="diamond-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <!-- outfield grass arc / warning track -->
+        <path d="M 5 70 Q 50 -10 95 70 L 95 95 L 5 95 Z" fill="#3d7a31" opacity=".55"/>
+        <!-- infield dirt -->
+        <circle cx="50" cy="68" r="22" fill="#b9874a"/>
+        <!-- infield grass -->
+        <polygon points="50,57 62,68 50,79 38,68" fill="#4a8b3b"/>
+        <!-- bases -->
+        <rect x="48.5" y="77.5" width="3" height="3" fill="#fff" stroke="#333" stroke-width=".3"/>
+        <rect x="60.5" y="66.5" width="3" height="3" fill="#fff" stroke="#333" stroke-width=".3"/>
+        <rect x="48.5" y="55.5" width="3" height="3" fill="#fff" stroke="#333" stroke-width=".3"/>
+        <rect x="36.5" y="66.5" width="3" height="3" fill="#fff" stroke="#333" stroke-width=".3"/>
+        <!-- pitcher's mound -->
+        <circle cx="50" cy="68" r="2.5" fill="#d4a06a"/>
+        <!-- foul lines -->
+        <line class="grass-line" x1="50" y1="79" x2="5" y2="34" stroke="#fff" stroke-width=".4"/>
+        <line class="grass-line" x1="50" y1="79" x2="95" y2="34" stroke="#fff" stroke-width=".4"/>
+      </svg>
+      <!-- Position slots positioned as % of field -->
+      <!-- Standard baseball field positions -->
+    </div>
+    <p class="hint">Drag a player onto a position. Drop on an occupied slot to swap. Click ✕ to clear.</p>
+  </section>
+
+  <!-- Batting order -->
+  <section class="panel">
+    <h2>Batting Order
+      <button class="btn" id="btnAutoFill2" style="font-size:11px;padding:3px 7px;">Auto-fill</button>
+    </h2>
+    <ol class="batting-list" id="battingList"></ol>
+    <p class="hint">Drag to reorder. Auto-fill pulls from the field.</p>
+  </section>
+</main>
+
+<script>
+// ============================================================
+// Position definitions — coordinates in % of the field box
+// ============================================================
+const POSITIONS = [
+  { id: "P",  label: "Pitcher",      x: 50, y: 68 },
+  { id: "C",  label: "Catcher",      x: 50, y: 91 },
+  { id: "1B", label: "First Base",   x: 65, y: 68 },
+  { id: "2B", label: "Second Base",  x: 57, y: 56 },
+  { id: "3B", label: "Third Base",   x: 35, y: 68 },
+  { id: "SS", label: "Shortstop",    x: 43, y: 56 },
+  { id: "LF", label: "Left Field",   x: 22, y: 30 },
+  { id: "CF", label: "Center Field", x: 50, y: 18 },
+  { id: "RF", label: "Right Field",  x: 78, y: 30 },
+];
+
+// ============================================================
+// State + persistence
+// ============================================================
+const STORAGE_KEY = "baseball-lineup-v1";
+const state = {
+  players: [],          // [{ id, name }]
+  assignments: {},      // { positionId: playerId }
+  battingOrder: [],     // [playerId, ...]  (length up to 9+)
+};
+
+function save() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {
+    // localStorage may be blocked in some sandboxes — ignore
+  }
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    Object.assign(state, data);
+  } catch (e) {}
+}
+const uid = () => Math.random().toString(36).slice(2, 9);
+
+// ============================================================
+// Player roster
+// ============================================================
+function addPlayerFromInput(e) {
+  e.preventDefault();
+  const input = document.getElementById("playerInput");
+  const name = input.value.trim();
+  if (!name) return;
+  state.players.push({ id: uid(), name });
+  input.value = "";
+  save();
+  renderAll();
+  input.focus();
+}
+
+function removePlayer(id) {
+  state.players = state.players.filter(p => p.id !== id);
+  for (const pos in state.assignments) {
+    if (state.assignments[pos] === id) delete state.assignments[pos];
+  }
+  state.battingOrder = state.battingOrder.filter(pid => pid !== id);
+  save();
+  renderAll();
+}
+
+function getPlayer(id) {
+  return state.players.find(p => p.id === id);
+}
+
+function getPlayerPosition(playerId) {
+  for (const [pos, pid] of Object.entries(state.assignments)) {
+    if (pid === playerId) return pos;
+  }
+  return null;
+}
+
+function renderRoster() {
+  const list = document.getElementById("rosterList");
+  list.innerHTML = "";
+  for (const p of state.players) {
+    const li = document.createElement("li");
+    const placed = getPlayerPosition(p.id);
+    li.className = "player" + (placed ? " placed" : "");
+    li.draggable = true;
+    li.dataset.playerId = p.id;
+    li.innerHTML = `
+      <span class="name">${escapeHtml(p.name)}</span>
+      ${placed ? `<span class="pos-tag">${placed}</span>` : ""}
+      <span class="x" title="Remove player">×</span>
+    `;
+    li.querySelector(".x").addEventListener("click", e => {
+      e.stopPropagation();
+      removePlayer(p.id);
+    });
+    li.addEventListener("dragstart", e => {
+      e.dataTransfer.setData("text/player-id", p.id);
+      e.dataTransfer.effectAllowed = "move";
+      li.classList.add("dragging");
+    });
+    li.addEventListener("dragend", () => li.classList.remove("dragging"));
+    list.appendChild(li);
+  }
+  document.getElementById("rosterCount").textContent =
+    state.players.length ? `(${state.players.length})` : "";
+}
+
+// ============================================================
+// Field
+// ============================================================
+function renderField() {
+  const field = document.getElementById("field");
+  // remove old slots only
+  field.querySelectorAll(".slot").forEach(n => n.remove());
+
+  for (const pos of POSITIONS) {
+    const playerId = state.assignments[pos.id];
+    const player = playerId ? getPlayer(playerId) : null;
+    const slot = document.createElement("div");
+    slot.className = "slot" + (player ? " filled" : "");
+    slot.style.left = pos.x + "%";
+    slot.style.top = pos.y + "%";
+    slot.dataset.position = pos.id;
+    slot.draggable = !!player;
+
+    slot.innerHTML = `
+      <div class="pos">${pos.id}</div>
+      ${player
+        ? `<div class="who">${escapeHtml(player.name)}</div>
+           <div class="clear" title="Remove from position">×</div>`
+        : `<div class="label">${pos.label}</div>`}
+    `;
+
+    if (player) {
+      slot.querySelector(".clear").addEventListener("click", e => {
+        e.stopPropagation();
+        delete state.assignments[pos.id];
+        save();
+        renderAll();
+      });
+      slot.addEventListener("dragstart", e => {
+        e.dataTransfer.setData("text/player-id", player.id);
+        e.dataTransfer.setData("text/from-position", pos.id);
+        e.dataTransfer.effectAllowed = "move";
+        slot.classList.add("dragging");
+      });
+      slot.addEventListener("dragend", () => slot.classList.remove("dragging"));
+    }
+
+    slot.addEventListener("dragover", e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      slot.classList.add("over");
+    });
+    slot.addEventListener("dragleave", () => slot.classList.remove("over"));
+    slot.addEventListener("drop", e => {
+      e.preventDefault();
+      slot.classList.remove("over");
+      const playerId = e.dataTransfer.getData("text/player-id");
+      const fromPosition = e.dataTransfer.getData("text/from-position");
+      if (!playerId) return;
+      assignPlayerToPosition(playerId, pos.id, fromPosition || null);
+    });
+
+    field.appendChild(slot);
+  }
+}
+
+function assignPlayerToPosition(playerId, targetPos, fromPos) {
+  const currentlyHere = state.assignments[targetPos];
+  // Remove player from any other position
+  for (const p in state.assignments) {
+    if (state.assignments[p] === playerId) delete state.assignments[p];
+  }
+  // If we displaced someone and we came from another slot, swap
+  if (currentlyHere && fromPos && currentlyHere !== playerId) {
+    state.assignments[fromPos] = currentlyHere;
+  }
+  state.assignments[targetPos] = playerId;
+  save();
+  renderAll();
+}
+
+// ============================================================
+// Batting order
+// ============================================================
+function renderBattingOrder() {
+  const list = document.getElementById("battingList");
+  list.innerHTML = "";
+  const slotsToShow = Math.max(12, state.battingOrder.length);
+
+  for (let i = 0; i < slotsToShow; i++) {
+    const playerId = state.battingOrder[i];
+    const player = playerId ? getPlayer(playerId) : null;
+    const li = document.createElement("li");
+    li.className = "bat-item" + (player ? "" : " empty");
+    li.dataset.index = i;
+    if (player) li.draggable = true;
+    const posTag = player ? getPlayerPosition(player.id) : null;
+    li.innerHTML = `
+      <span class="num">${i + 1}</span>
+      <span class="name">${player ? escapeHtml(player.name) : "— empty —"}</span>
+      ${posTag ? `<span class="pos-tag">${posTag}</span>` : ""}
+    `;
+
+    if (player) {
+      li.addEventListener("dragstart", e => {
+        e.dataTransfer.setData("text/bat-index", String(i));
+        e.dataTransfer.setData("text/player-id", player.id);
+        e.dataTransfer.effectAllowed = "move";
+        li.classList.add("dragging");
+      });
+      li.addEventListener("dragend", () => li.classList.remove("dragging"));
+    }
+
+    li.addEventListener("dragover", e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      li.classList.add("over");
+    });
+    li.addEventListener("dragleave", () => li.classList.remove("over"));
+    li.addEventListener("drop", e => {
+      e.preventDefault();
+      li.classList.remove("over");
+      const fromIdxRaw = e.dataTransfer.getData("text/bat-index");
+      const playerId = e.dataTransfer.getData("text/player-id");
+      const targetIdx = i;
+      if (fromIdxRaw !== "") {
+        // reorder within batting list
+        const fromIdx = parseInt(fromIdxRaw, 10);
+        reorderBatting(fromIdx, targetIdx);
+      } else if (playerId) {
+        // dropped a player from roster or field into the batting order
+        placeInBattingSlot(playerId, targetIdx);
+      }
+    });
+
+    list.appendChild(li);
+  }
+}
+
+function reorderBatting(from, to) {
+  if (from === to) return;
+  const arr = [...state.battingOrder];
+  // pad with nulls to keep alignment if dropping past end
+  while (arr.length <= Math.max(from, to)) arr.push(null);
+  const [moved] = arr.splice(from, 1);
+  arr.splice(to, 0, moved);
+  // trim trailing nulls
+  while (arr.length && arr[arr.length - 1] == null) arr.pop();
+  state.battingOrder = arr;
+  save();
+  renderAll();
+}
+
+function placeInBattingSlot(playerId, idx) {
+  // Remove this player from order if present
+  const arr = state.battingOrder.filter(id => id !== playerId);
+  while (arr.length < idx) arr.push(null);
+  arr.splice(idx, 0, playerId);
+  // Trim trailing nulls
+  while (arr.length && arr[arr.length - 1] == null) arr.pop();
+  state.battingOrder = arr;
+  save();
+  renderAll();
+}
+
+function autoFillBattingOrder() {
+  // Use everyone currently on the field, in standard position order,
+  // appending any roster players not yet in the order.
+  const fielded = POSITIONS
+    .map(p => state.assignments[p.id])
+    .filter(Boolean);
+  const seen = new Set(fielded);
+  const remaining = state.players
+    .map(p => p.id)
+    .filter(id => !seen.has(id));
+  state.battingOrder = [...fielded, ...remaining];
+  save();
+  renderAll();
+}
+
+// ============================================================
+// Misc
+// ============================================================
+function clearAll() {
+  if (!confirm("Clear roster, field, and batting order?")) return;
+  state.players = [];
+  state.assignments = {};
+  state.battingOrder = [];
+  save();
+  renderAll();
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
+function updatePrintDate() {
+  const d = new Date();
+  document.getElementById("printDate").textContent =
+    d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+}
+
+function renderAll() {
+  renderRoster();
+  renderField();
+  renderBattingOrder();
+}
+
+// Event wiring (avoid inline handlers — some sandboxes block them)
+document.getElementById("rosterForm").addEventListener("submit", addPlayerFromInput);
+document.getElementById("btnAutoFill").addEventListener("click", autoFillBattingOrder);
+document.getElementById("btnAutoFill2").addEventListener("click", autoFillBattingOrder);
+document.getElementById("btnClearAll").addEventListener("click", clearAll);
+document.getElementById("btnPrint").addEventListener("click", () => window.print());
+
+// Boot
+load();
+updatePrintDate();
+renderAll();
+</script>
+</body>
+</html>
