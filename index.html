@@ -148,12 +148,55 @@
     flex-direction: column;
   }
   .field-wrap h2 {
-    margin: 0 0 8px;
+    margin: 0;
     font-size: 13px;
     text-transform: uppercase;
     letter-spacing: .8px;
     color: var(--muted);
   }
+  .field-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .field-header h2 { white-space: nowrap; }
+  .inning-tabs { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; }
+  .inning-tab {
+    width: 32px;
+    height: 32px;
+    border: 1px solid #d1d5db;
+    background: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: 0;
+  }
+  .inning-tab:hover { background: #f3f4f6; }
+  .inning-tab.active {
+    background: var(--accent-2);
+    border-color: var(--accent-2);
+    color: white;
+  }
+  .inning-tab .dot {
+    position: absolute;
+    bottom: 3px;
+    right: 3px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .inning-tab.active .dot { background: white; }
+  .inning-actions { display: flex; gap: 4px; }
+  .inning-actions .btn { font-size: 11px; padding: 4px 8px; }
   .field {
     position: relative;
     width: 100%;
@@ -288,43 +331,85 @@
 
   .hint { color: var(--muted); font-size: 11px; margin-top: 8px; }
 
+  /* print mini-fields (only visible when printing) */
+  .print-innings { display: none; }
+  .print-inning-card { break-inside: avoid; page-break-inside: avoid; }
+  .print-mini-field {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background: white;
+    border: 1px solid #999;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .print-mini-field .slot {
+    width: 22%;
+    height: 22%;
+    border: 1px solid #333;
+    background: white;
+    color: black;
+    text-shadow: none;
+    font-size: 7px;
+  }
+  .print-mini-field .slot:not(.filled) { opacity: .35; border-style: dashed; }
+  .print-mini-field .slot .pos { font-size: 9px; color: var(--accent); margin: 0; }
+  .print-mini-field .slot .who {
+    font-size: 7px;
+    line-height: 1.05;
+    margin-top: 1px;
+    padding: 0 2px;
+    font-weight: 600;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    text-align: center;
+  }
+  .print-inning-title {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    margin: 0 0 3px;
+    color: var(--accent-2);
+  }
+
   /* print */
   @media print {
     body { background: white; }
     header, .toolbar, .roster-input, .player .x, .slot.filled .clear,
-    .panel h2 .btn, .hint, .roster-panel, .clear-all-btn {
+    .panel h2 .btn, .hint, .roster-panel, .clear-all-btn,
+    .field-wrap, .field-header, .inning-tabs, .inning-actions {
       display: none !important;
     }
     main {
-      grid-template-columns: 1fr 1fr;
+      display: block !important;
       max-width: none;
-      gap: 12px;
+      gap: 0;
+      padding: 0;
+    }
+    main > .panel:last-child {
+      /* Batting order panel — show as a simple list */
+      box-shadow: none;
+      border: 1px solid #ccc;
       padding: 8px;
+      margin-top: 8px;
     }
-    .panel, .field-wrap { box-shadow: none; border: 1px solid #ccc; padding: 10px; }
-    .field {
-      background: white !important;
-      background-image: none !important;
-      border: 1px solid #999;
+    .print-innings {
+      display: grid !important;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 8px;
     }
-    .slot {
-      background: white !important;
-      color: black !important;
-      text-shadow: none !important;
-      border: 1px solid #333 !important;
-    }
-    .slot:not(.filled) { opacity: .35; }
-    .slot .pos { color: var(--accent); }
-    .diamond-svg .grass-line { stroke: #888 !important; }
     .print-title {
       display: block !important;
       text-align: center;
       font-size: 18px;
       font-weight: 700;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
     }
-    .print-date { display: block !important; text-align: center; font-size: 11px; color: #666; margin-bottom: 12px; }
-    @page { margin: 0.4in; }
+    .print-date { display: block !important; text-align: center; font-size: 11px; color: #666; margin-bottom: 10px; }
+    @page { margin: 0.35in; }
   }
   .print-title, .print-date { display: none; }
 </style>
@@ -343,6 +428,8 @@
 <div class="print-title" id="printTitle">Team Lineup</div>
 <div class="print-date" id="printDate"></div>
 
+<div class="print-innings" id="printInnings"></div>
+
 <main>
   <!-- Roster -->
   <section class="panel roster-panel">
@@ -357,7 +444,14 @@
 
   <!-- Field -->
   <section class="field-wrap">
-    <h2>Field</h2>
+    <div class="field-header">
+      <h2>Defensive Lineup</h2>
+      <div class="inning-tabs" id="inningTabs"></div>
+      <div class="inning-actions">
+        <button class="btn" id="btnCopyPrev" title="Copy previous inning's lineup into this one">⧉ Copy from prev</button>
+        <button class="btn danger" id="btnClearInning" title="Clear this inning's positions">Clear inning</button>
+      </div>
+    </div>
     <div class="field" id="field">
       <svg class="diamond-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
         <!-- outfield grass arc / warning track -->
@@ -413,10 +507,19 @@ const POSITIONS = [
 // State + persistence
 // ============================================================
 const STORAGE_KEY = "baseball-lineup-v1";
+const NUM_INNINGS = 6;
+
+function emptyLineups() {
+  const o = {};
+  for (let i = 1; i <= NUM_INNINGS; i++) o[i] = {};
+  return o;
+}
+
 const state = {
   players: [],          // [{ id, name }]
-  assignments: {},      // { positionId: playerId }
-  battingOrder: [],     // [playerId, ...]  (length up to 9+)
+  lineups: emptyLineups(), // { 1: {positionId: playerId}, 2: {...}, ... 6: {...} }
+  battingOrder: [],     // [playerId, ...]  shared across all innings
+  currentInning: 1,
 };
 
 function save() {
@@ -431,8 +534,24 @@ function load() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
     const data = JSON.parse(raw);
+    // Migrate old single-assignments format → lineups[1]
+    if (data.assignments && !data.lineups) {
+      data.lineups = emptyLineups();
+      data.lineups[1] = data.assignments;
+      delete data.assignments;
+    }
+    if (!data.lineups) data.lineups = emptyLineups();
+    // Make sure all 6 inning keys exist
+    for (let i = 1; i <= NUM_INNINGS; i++) {
+      if (!data.lineups[i]) data.lineups[i] = {};
+    }
+    if (!data.currentInning) data.currentInning = 1;
     Object.assign(state, data);
   } catch (e) {}
+}
+
+function currentLineup() {
+  return state.lineups[state.currentInning];
 }
 const uid = () => Math.random().toString(36).slice(2, 9);
 
@@ -453,8 +572,12 @@ function addPlayerFromInput(e) {
 
 function removePlayer(id) {
   state.players = state.players.filter(p => p.id !== id);
-  for (const pos in state.assignments) {
-    if (state.assignments[pos] === id) delete state.assignments[pos];
+  // Remove this player from all innings' lineups
+  for (let i = 1; i <= NUM_INNINGS; i++) {
+    const lineup = state.lineups[i];
+    for (const pos in lineup) {
+      if (lineup[pos] === id) delete lineup[pos];
+    }
   }
   state.battingOrder = state.battingOrder.filter(pid => pid !== id);
   save();
@@ -465,8 +588,19 @@ function getPlayer(id) {
   return state.players.find(p => p.id === id);
 }
 
+// Position in the *currently selected* inning (used in roster sidebar)
 function getPlayerPosition(playerId) {
-  for (const [pos, pid] of Object.entries(state.assignments)) {
+  for (const [pos, pid] of Object.entries(currentLineup())) {
+    if (pid === playerId) return pos;
+  }
+  return null;
+}
+
+// Position in a specific inning (used by batting-order tag, optional)
+function getPlayerPositionInInning(playerId, inning) {
+  const lineup = state.lineups[inning];
+  if (!lineup) return null;
+  for (const [pos, pid] of Object.entries(lineup)) {
     if (pid === playerId) return pos;
   }
   return null;
@@ -505,13 +639,39 @@ function renderRoster() {
 // ============================================================
 // Field
 // ============================================================
+function renderInningTabs() {
+  const wrap = document.getElementById("inningTabs");
+  wrap.innerHTML = "";
+  for (let i = 1; i <= NUM_INNINGS; i++) {
+    const btn = document.createElement("button");
+    btn.className = "inning-tab" + (i === state.currentInning ? " active" : "");
+    btn.title = `Inning ${i}`;
+    btn.textContent = i;
+    const filledCount = Object.values(state.lineups[i]).filter(Boolean).length;
+    if (filledCount > 0) {
+      const dot = document.createElement("span");
+      dot.className = "dot";
+      dot.title = `${filledCount} filled`;
+      btn.appendChild(dot);
+    }
+    btn.addEventListener("click", () => {
+      state.currentInning = i;
+      save();
+      renderAll();
+    });
+    wrap.appendChild(btn);
+  }
+}
+
 function renderField() {
   const field = document.getElementById("field");
   // remove old slots only
   field.querySelectorAll(".slot").forEach(n => n.remove());
 
+  const lineup = currentLineup();
+
   for (const pos of POSITIONS) {
-    const playerId = state.assignments[pos.id];
+    const playerId = lineup[pos.id];
     const player = playerId ? getPlayer(playerId) : null;
     const slot = document.createElement("div");
     slot.className = "slot" + (player ? " filled" : "");
@@ -531,7 +691,7 @@ function renderField() {
     if (player) {
       slot.querySelector(".clear").addEventListener("click", e => {
         e.stopPropagation();
-        delete state.assignments[pos.id];
+        delete currentLineup()[pos.id];
         save();
         renderAll();
       });
@@ -564,16 +724,35 @@ function renderField() {
 }
 
 function assignPlayerToPosition(playerId, targetPos, fromPos) {
-  const currentlyHere = state.assignments[targetPos];
-  // Remove player from any other position
-  for (const p in state.assignments) {
-    if (state.assignments[p] === playerId) delete state.assignments[p];
+  const lineup = currentLineup();
+  const currentlyHere = lineup[targetPos];
+  // Remove player from any other position in THIS inning only
+  for (const p in lineup) {
+    if (lineup[p] === playerId) delete lineup[p];
   }
   // If we displaced someone and we came from another slot, swap
   if (currentlyHere && fromPos && currentlyHere !== playerId) {
-    state.assignments[fromPos] = currentlyHere;
+    lineup[fromPos] = currentlyHere;
   }
-  state.assignments[targetPos] = playerId;
+  lineup[targetPos] = playerId;
+  save();
+  renderAll();
+}
+
+function copyFromPreviousInning() {
+  if (state.currentInning <= 1) {
+    alert("No previous inning to copy from.");
+    return;
+  }
+  const prev = state.lineups[state.currentInning - 1];
+  state.lineups[state.currentInning] = { ...prev };
+  save();
+  renderAll();
+}
+
+function clearCurrentInning() {
+  if (!confirm(`Clear all positions for inning ${state.currentInning}?`)) return;
+  state.lineups[state.currentInning] = {};
   save();
   renderAll();
 }
@@ -663,10 +842,11 @@ function placeInBattingSlot(playerId, idx) {
 }
 
 function autoFillBattingOrder() {
-  // Use everyone currently on the field, in standard position order,
-  // appending any roster players not yet in the order.
+  // Use everyone fielded in the *currently selected* inning, in standard
+  // position order, appending any roster players not yet in the order.
+  const lineup = currentLineup();
   const fielded = POSITIONS
-    .map(p => state.assignments[p.id])
+    .map(p => lineup[p.id])
     .filter(Boolean);
   const seen = new Set(fielded);
   const remaining = state.players
@@ -681,10 +861,11 @@ function autoFillBattingOrder() {
 // Misc
 // ============================================================
 function clearAll() {
-  if (!confirm("Clear roster, field, and batting order?")) return;
+  if (!confirm("Clear roster, all 6 inning lineups, and batting order?")) return;
   state.players = [];
-  state.assignments = {};
+  state.lineups = emptyLineups();
   state.battingOrder = [];
+  state.currentInning = 1;
   save();
   renderAll();
 }
@@ -701,10 +882,46 @@ function updatePrintDate() {
     d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
 }
 
+// Build 6 mini-fields for print output
+function renderPrintInnings() {
+  const wrap = document.getElementById("printInnings");
+  wrap.innerHTML = "";
+  for (let i = 1; i <= NUM_INNINGS; i++) {
+    const lineup = state.lineups[i];
+    const card = document.createElement("div");
+    card.className = "print-inning-card";
+    let slotsHtml = "";
+    for (const pos of POSITIONS) {
+      const playerId = lineup[pos.id];
+      const player = playerId ? getPlayer(playerId) : null;
+      const filledClass = player ? " filled" : "";
+      const inner = player
+        ? `<div class="pos">${pos.id}</div><div class="who">${escapeHtml(player.name)}</div>`
+        : `<div class="pos">${pos.id}</div>`;
+      slotsHtml += `<div class="slot${filledClass}" style="left:${pos.x}%;top:${pos.y}%;">${inner}</div>`;
+    }
+    card.innerHTML = `
+      <div class="print-inning-title">Inning ${i}</div>
+      <div class="print-mini-field">
+        <svg class="diamond-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <circle cx="50" cy="68" r="22" fill="#eee" stroke="#999" stroke-width=".3"/>
+          <polygon points="50,57 62,68 50,79 38,68" fill="white" stroke="#999" stroke-width=".3"/>
+          <line x1="50" y1="79" x2="5" y2="34" stroke="#999" stroke-width=".4"/>
+          <line x1="50" y1="79" x2="95" y2="34" stroke="#999" stroke-width=".4"/>
+        </svg>
+        ${slotsHtml}
+      </div>
+    `;
+    wrap.appendChild(card);
+  }
+}
+
 function renderAll() {
   renderRoster();
+  renderInningTabs();
   renderField();
   renderBattingOrder();
+  renderPrintInnings();
 }
 
 // Event wiring (avoid inline handlers — some sandboxes block them)
@@ -712,6 +929,8 @@ document.getElementById("rosterForm").addEventListener("submit", addPlayerFromIn
 document.getElementById("btnAutoFill").addEventListener("click", autoFillBattingOrder);
 document.getElementById("btnAutoFill2").addEventListener("click", autoFillBattingOrder);
 document.getElementById("btnClearAll").addEventListener("click", clearAll);
+document.getElementById("btnCopyPrev").addEventListener("click", copyFromPreviousInning);
+document.getElementById("btnClearInning").addEventListener("click", clearCurrentInning);
 document.getElementById("btnPrint").addEventListener("click", () => window.print());
 
 // Boot
