@@ -340,6 +340,44 @@
 
   .hint { color: var(--muted); font-size: 11px; margin-top: 8px; }
 
+  /* summary table */
+  .summary-panel { grid-column: 1 / -1; }
+  .summary-table-wrap { overflow-x: auto; }
+  .summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .summary-table th, .summary-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #e5e7eb;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .summary-table th {
+    background: #f9fafb;
+    font-weight: 600;
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .summary-table td.player-name {
+    text-align: left;
+    font-weight: 600;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .summary-table td.bench { color: #cbd5e1; }
+  .summary-table td.pos-cell {
+    font-weight: 600;
+    color: var(--accent);
+    background: #fef2f2;
+  }
+  .summary-table td.count-cell { font-weight: 700; }
+  .summary-table tr.empty-roster td { color: var(--muted); font-style: italic; }
+
   /* print mini-fields (only visible when printing) */
   .print-innings { display: none; }
   .print-inning-card { break-inside: avoid; page-break-inside: avoid; }
@@ -412,6 +450,16 @@
       gap: 8px;
       margin-bottom: 8px;
     }
+    .summary-panel {
+      box-shadow: none;
+      border: 1px solid #ccc;
+      padding: 8px;
+      margin-top: 8px;
+      page-break-inside: avoid;
+    }
+    .summary-table { font-size: 11px; }
+    .summary-table th, .summary-table td { padding: 3px 5px; }
+    .summary-table td.pos-cell { background: #f3f4f6 !important; color: #000 !important; }
     .print-title {
       display: block !important;
       text-align: center;
@@ -486,6 +534,15 @@
       <!-- Standard baseball field positions -->
     </div>
     <p class="hint">Drag a player onto a position. Drop on an occupied slot to swap. Click ✕ to clear.</p>
+  </section>
+
+  <!-- Player summary (full width, below) -->
+  <section class="panel summary-panel">
+    <h2>Player Summary <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">— positions played each inning</span></h2>
+    <div class="summary-table-wrap">
+      <table class="summary-table" id="summaryTable"></table>
+    </div>
+    <p class="hint">A dash (—) means the player is on the bench that inning.</p>
   </section>
 
   <!-- Batting order -->
@@ -916,6 +973,39 @@ function updatePrintDate() {
     d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
 }
 
+// Build the per-player position-by-inning summary
+function renderSummary() {
+  const table = document.getElementById("summaryTable");
+  if (state.players.length === 0) {
+    table.innerHTML = `<tr class="empty-roster"><td>Add players to see the summary.</td></tr>`;
+    return;
+  }
+  let header = `<tr><th class="player-name" style="text-align:left;">Player</th><th>Innings</th>`;
+  for (let i = 1; i <= NUM_INNINGS; i++) header += `<th>${i}</th>`;
+  header += `</tr>`;
+
+  let body = "";
+  for (const p of state.players) {
+    const positionsByInning = [];
+    for (let i = 1; i <= NUM_INNINGS; i++) {
+      positionsByInning.push(getPlayerPositionInInning(p.id, i));
+    }
+    const playedCount = positionsByInning.filter(Boolean).length;
+
+    let row = `<tr><td class="player-name">${escapeHtml(p.name)}</td>`;
+    row += `<td class="count-cell">${playedCount}/${NUM_INNINGS}</td>`;
+    for (const pos of positionsByInning) {
+      row += pos
+        ? `<td class="pos-cell">${pos}</td>`
+        : `<td class="bench">—</td>`;
+    }
+    row += `</tr>`;
+    body += row;
+  }
+
+  table.innerHTML = header + body;
+}
+
 // Build 6 mini-fields for print output
 function renderPrintInnings() {
   const wrap = document.getElementById("printInnings");
@@ -955,6 +1045,7 @@ function renderAll() {
   renderInningTabs();
   renderField();
   renderBattingOrder();
+  renderSummary();
   renderPrintInnings();
 }
 
