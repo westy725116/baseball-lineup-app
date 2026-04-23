@@ -328,6 +328,15 @@
   .bat-item .pos-tag { font-size: 10px; color: var(--muted); font-weight: 600; }
   .bat-item.empty { color: var(--muted); font-style: italic; cursor: default; }
   .bat-item.empty .num { background: #d1d5db; }
+  .bat-item .bat-x {
+    cursor: pointer;
+    color: var(--muted);
+    padding: 0 4px;
+    font-size: 16px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .bat-item .bat-x:hover { color: var(--accent); }
 
   .hint { color: var(--muted); font-size: 11px; margin-top: 8px; }
 
@@ -379,9 +388,11 @@
     body { background: white; }
     header, .toolbar, .roster-input, .player .x, .slot.filled .clear,
     .panel h2 .btn, .hint, .roster-panel, .clear-all-btn,
-    .field-wrap, .field-header, .inning-tabs, .inning-actions {
+    .field-wrap, .field-header, .inning-tabs, .inning-actions,
+    .bat-item .bat-x, #btnAddBattingSlot {
       display: none !important;
     }
+    .bat-item.empty { display: none !important; }
     main {
       display: block !important;
       max-width: none;
@@ -483,7 +494,8 @@
       <button class="btn" id="btnAutoFill2" style="font-size:11px;padding:3px 7px;">Auto-fill</button>
     </h2>
     <ol class="batting-list" id="battingList"></ol>
-    <p class="hint">Drag to reorder. Auto-fill pulls from the field.</p>
+    <button class="btn" id="btnAddBattingSlot" style="margin-top:6px;width:100%;font-size:11px;">+ Add slot</button>
+    <p class="hint">Drag to reorder. ✕ to remove a batter. + to add a slot.</p>
   </section>
 </main>
 
@@ -515,10 +527,12 @@ function emptyLineups() {
   return o;
 }
 
+const DEFAULT_BATTING_SLOTS = 12;
+
 const state = {
   players: [],          // [{ id, name }]
   lineups: emptyLineups(), // { 1: {positionId: playerId}, 2: {...}, ... 6: {...} }
-  battingOrder: [],     // [playerId, ...]  shared across all innings
+  battingOrder: new Array(DEFAULT_BATTING_SLOTS).fill(null), // shared across innings; null = empty slot
   currentInning: 1,
 };
 
@@ -546,6 +560,10 @@ function load() {
       if (!data.lineups[i]) data.lineups[i] = {};
     }
     if (!data.currentInning) data.currentInning = 1;
+    // If saved batting order is empty (legacy fresh state), fall back to default 12 empty slots
+    if (Array.isArray(data.battingOrder) && data.battingOrder.length === 0) {
+      delete data.battingOrder;
+    }
     Object.assign(state, data);
   } catch (e) {}
 }
@@ -763,7 +781,7 @@ function clearCurrentInning() {
 function renderBattingOrder() {
   const list = document.getElementById("battingList");
   list.innerHTML = "";
-  const slotsToShow = Math.max(12, state.battingOrder.length);
+  const slotsToShow = state.battingOrder.length;
 
   for (let i = 0; i < slotsToShow; i++) {
     const playerId = state.battingOrder[i];
@@ -777,7 +795,12 @@ function renderBattingOrder() {
       <span class="num">${i + 1}</span>
       <span class="name">${player ? escapeHtml(player.name) : "— empty —"}</span>
       ${posTag ? `<span class="pos-tag">${posTag}</span>` : ""}
+      <span class="bat-x" title="Remove this slot">×</span>
     `;
+    li.querySelector(".bat-x").addEventListener("click", e => {
+      e.stopPropagation();
+      removeBattingSlot(i);
+    });
 
     if (player) {
       li.addEventListener("dragstart", e => {
@@ -818,24 +841,35 @@ function renderBattingOrder() {
 function reorderBatting(from, to) {
   if (from === to) return;
   const arr = [...state.battingOrder];
-  // pad with nulls to keep alignment if dropping past end
   while (arr.length <= Math.max(from, to)) arr.push(null);
   const [moved] = arr.splice(from, 1);
   arr.splice(to, 0, moved);
-  // trim trailing nulls
-  while (arr.length && arr[arr.length - 1] == null) arr.pop();
   state.battingOrder = arr;
   save();
   renderAll();
 }
 
+function removeBattingSlot(idx) {
+  state.battingOrder.splice(idx, 1);
+  save();
+  renderAll();
+}
+
+function addBattingSlot() {
+  state.battingOrder.push(null);
+  save();
+  renderAll();
+}
+
 function placeInBattingSlot(playerId, idx) {
-  // Remove this player from order if present
-  const arr = state.battingOrder.filter(id => id !== playerId);
-  while (arr.length < idx) arr.push(null);
-  arr.splice(idx, 0, playerId);
-  // Trim trailing nulls
-  while (arr.length && arr[arr.length - 1] == null) arr.pop();
+  // Replace whatever is at idx with the dropped player.
+  // Also remove the player from any other slot they were in.
+  const arr = [...state.battingOrder];
+  while (arr.length <= idx) arr.push(null);
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i] === playerId && i !== idx) arr[i] = null;
+  }
+  arr[idx] = playerId;
   state.battingOrder = arr;
   save();
   renderAll();
@@ -931,6 +965,7 @@ document.getElementById("btnAutoFill2").addEventListener("click", autoFillBattin
 document.getElementById("btnClearAll").addEventListener("click", clearAll);
 document.getElementById("btnCopyPrev").addEventListener("click", copyFromPreviousInning);
 document.getElementById("btnClearInning").addEventListener("click", clearCurrentInning);
+document.getElementById("btnAddBattingSlot").addEventListener("click", addBattingSlot);
 document.getElementById("btnPrint").addEventListener("click", () => window.print());
 
 // Boot
